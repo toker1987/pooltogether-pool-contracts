@@ -10,7 +10,8 @@
   "scripts": {
     "test": "buidler test",
     "compile": "buidler --show-stack-traces --max-memory 8192 compile",
-    "start": "buidler node --port $LOCAL_BUIDLEREVM_PORT",
+    "start": "buidler node --port $LOCAL_BUIDLEREVM_PORT --export ./deployments.json",
+    "deploy": "buidler deploy --export ./deployments.json",
     "coverage": "rm -rf build cache test-results.xml && buidler compile && buidler coverage --network coverage --temp build; rm -rf cache",
     "gas": "REPORT_GAS=true buidler test --network local",
     "migrate": "./scripts/cli.js",
@@ -53,6 +54,7 @@
     "@pooltogether/governor-contracts": "^0.1.1",
     "@pooltogether/oz-migrate": "^0.2.5",
     "@pooltogether/uniform-random-number": "pooltogether/uniform-random-number#solidity-0.6",
+    "buidler-deploy": "^0.4.5",
     "debug": "^4.1.1",
     "deploy-eip-1820": "^0.2.0",
     "ethereum-waffle": "^2.5.1",
