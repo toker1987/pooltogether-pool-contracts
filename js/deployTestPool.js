@@ -64,7 +64,7 @@ async function deployTestPool({
     prizeStrategy.address,
     [ticket.address, sponsorship.address],
     maxExitFeeMantissa || toWei('0.5'),
-    maxTimelockDuration || prizePeriodSeconds,
+    maxTimelockDuration || '10000',
     cToken.address
   )
 

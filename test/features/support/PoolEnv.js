@@ -18,7 +18,14 @@ function PoolEnv() {
 
   this.overrides = { gasLimit: 40000000 }
 
-  this.createPool = async function ({ prizePeriodSeconds, exitFee, creditRate, externalAwards = [] }) {
+  this.createPool = async function ({
+    prizePeriodSeconds,
+    exitFee,
+    creditRate,
+    maxExitFeeMantissa = toWei('0.5'),
+    maxTimelockDuration = 1000,
+    externalAwards = []
+  }) {
     this.wallets = await buidler.ethers.getSigners()
 
     const externalAwardAddresses = []
@@ -33,8 +40,8 @@ function PoolEnv() {
     this.env = await deployTestPool({
       wallet: this.wallets[0],
       prizePeriodSeconds,
-      maxExitFeePercentage: toWei('0.5'),
-      maxTimelockDuration: ethers.utils.bigNumberify('' + prizePeriodSeconds).mul('4'),
+      maxExitFeeMantissa,
+      maxTimelockDuration,
       exitFee: toWei(exitFee),
       creditRate: toWei(creditRate),
       overrides: this.overrides,
@@ -102,7 +109,7 @@ function PoolEnv() {
 
     debug('Depositing...')
 
-    await prizePool.depositTo(wallet._address, amount, ticket.address, this.overrides)
+    await prizePool.depositTo(wallet._address, amount, ticket.address, [], this.overrides)
 
     debug(`Bought tickets`)
   }
@@ -249,7 +256,7 @@ function PoolEnv() {
     let wallet = await this.wallet(user)
     let ticket = await this.ticket(wallet)
     let prizePool = await this.prizePool(wallet)
-    await prizePool.withdrawInstantlyFrom(wallet._address, toWei(tickets), ticket.address, '0', toWei('1000'))
+    await prizePool.withdrawInstantlyFrom(wallet._address, toWei(tickets), ticket.address, '0', toWei('1000'), [])
   }
 
   this.withdrawInstantlyAtTime = async function ({ user, tickets, elapsed }) {
@@ -262,7 +269,7 @@ function PoolEnv() {
     let wallet = await this.wallet(user)
     let ticket = await this.ticket(wallet)
     let prizePool = await this.prizePool(wallet)
-    await prizePool.withdrawWithTimelockFrom(wallet._address, toWei(tickets), ticket.address)
+    await prizePool.withdrawWithTimelockFrom(wallet._address, toWei(tickets), ticket.address, [])
   }
 
   this.withdrawWithTimelockAtTime = async function ({ user, tickets, elapsed }) {

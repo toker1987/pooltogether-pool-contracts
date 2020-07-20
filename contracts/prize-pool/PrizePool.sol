@@ -24,13 +24,56 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
   }
 
   event CapturedAward(uint256 amount);
-  event TimelockDeposited(address indexed operator, address indexed to, address indexed token, uint256 amount);
-  event Deposited(address indexed operator, address indexed to, address indexed token, uint256 amount);
-  event Awarded(address indexed winner, address indexed token, uint256 amount);
-  event AwardedExternal(address indexed winner, address indexed token, uint256 amount);
-  event InstantWithdrawal(address indexed operator, address indexed from, address indexed token, uint256 amount, uint256 exitFee, uint256 sponsoredExitFee);
-  event TimelockedWithdrawal(address indexed operator, address indexed from, address indexed token, uint256 amount, uint256 unlockTimestamp);
-  event TimelockedWithdrawalSwept(address indexed operator, address indexed from, uint256 amount);
+  
+  event Deposited(
+    address indexed operator,
+    address indexed to,
+    address indexed token,
+    uint256 amount
+  );
+
+  event TimelockDeposited(
+    address indexed operator,
+    address indexed to,
+    address indexed token,
+    uint256 amount
+  );
+
+  event Awarded(
+    address indexed winner,
+    address indexed token,
+    uint256 amount
+  );
+  
+  event AwardedExternal(
+    address indexed winner,
+    address indexed token,
+    uint256 amount
+  );
+  
+  event InstantWithdrawal(
+    address indexed operator,
+    address indexed from,
+    address indexed token,
+    uint256 amount,
+    uint256 exitFee,
+    uint256 sponsoredExitFee
+  );
+  
+  event TimelockedWithdrawal(
+    address indexed operator,
+    address indexed from,
+    address indexed token,
+    uint256 amount,
+    uint256 unlockTimestamp
+  );
+  
+  event TimelockedWithdrawalSwept(
+    address indexed operator,
+    address indexed from,
+    uint256 amount
+  );
+
   event PrizeStrategyDetached();
 
   MappedSinglyLinkedList.Mapping internal _tokens;
@@ -151,7 +194,16 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
   /// @param to The address receiving the Tickets
   /// @param amount The amount of assets to deposit to purchase tickets
   /// @param controlledToken The address of the Asset Token being deposited
-  function depositTo(address to, uint256 amount, address controlledToken) external onlyControlledToken(controlledToken) nonReentrant {
+  function depositTo(
+    address to,
+    uint256 amount,
+    address controlledToken,
+    bytes calldata data
+  )
+    external
+    onlyControlledToken(controlledToken)
+    nonReentrant
+  {
     require(_hasPrizeStrategy(), "PrizePool/prize-strategy-detached");
     _updateAwardBalance();
 
@@ -161,7 +213,7 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     _token().transferFrom(operator, address(this), amount);
     _supply(amount);
 
-    prizeStrategy.afterDepositTo(to, amount, controlledToken);
+    prizeStrategy.afterDepositTo(to, amount, controlledToken, data);
 
     emit Deposited(operator, to, controlledToken, amount);
   }
@@ -178,7 +230,8 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     uint256 amount,
     address controlledToken,
     uint256 sponsorAmount,
-    uint256 maximumExitFee
+    uint256 maximumExitFee,
+    bytes calldata data
   )
     external
     nonReentrant
@@ -187,9 +240,8 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
   {
     _updateAwardBalance();
 
-    bool hasPrizeStrategy = _hasPrizeStrategy();
-    if (hasPrizeStrategy) {
-      exitFee = prizeStrategy.beforeWithdrawInstantlyFrom(from, amount, controlledToken);
+    if (_hasPrizeStrategy()) {
+      exitFee = limitExitFee(amount, prizeStrategy.beforeWithdrawInstantlyFrom(from, amount, controlledToken, data));
     }
 
     uint256 maxFee = FixedPoint.multiplyUintByMantissa(amount, maxExitFeeMantissa);
@@ -198,13 +250,12 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     }
     require(exitFee <= maximumExitFee, "PrizePool/exit-fee-exceeds-user-maximum");
 
-    address operator = _msgSender();
     uint256 sponsoredExitFeePortion = (exitFee > sponsorAmount) ? sponsorAmount : exitFee;
     uint256 userExitFee = exitFee.sub(sponsoredExitFeePortion);
 
     if (sponsoredExitFeePortion > 0) {
       // transfer the fee to this contract
-      _token().transferFrom(operator, address(this), sponsoredExitFeePortion);
+      _token().transferFrom(_msgSender(), address(this), sponsoredExitFeePortion);
     }
 
     // burn the tickets
@@ -215,11 +266,19 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     _redeem(amountLessFee);
     _token().transfer(from, amountLessFee);
 
-    if (hasPrizeStrategy) {
-      prizeStrategy.afterWithdrawInstantlyFrom(operator, from, amount, controlledToken, exitFee, sponsoredExitFeePortion);
+    if (_hasPrizeStrategy()) {
+      prizeStrategy.afterWithdrawInstantlyFrom(_msgSender(), from, amount, controlledToken, exitFee, sponsoredExitFeePortion, data);
     }
 
-    emit InstantWithdrawal(operator, from, controlledToken, amount, exitFee, sponsoredExitFeePortion);
+    emit InstantWithdrawal(_msgSender(), from, controlledToken, amount, exitFee, sponsoredExitFeePortion);
+  }
+
+  function limitExitFee(uint256 withdrawalAmount, uint256 exitFee) internal view returns (uint256) {
+    uint256 maxFee = FixedPoint.multiplyUintByMantissa(withdrawalAmount, maxExitFeeMantissa);
+    if (exitFee > maxFee) {
+      exitFee = maxFee;
+    }
+    return exitFee;
   }
 
   /// @notice Withdraw assets from the Prize Pool with a timelock on the assets
@@ -232,7 +291,8 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
   function withdrawWithTimelockFrom(
     address from,
     uint256 amount,
-    address controlledToken
+    address controlledToken,
+    bytes calldata data
   )
     external
     nonReentrant
@@ -242,9 +302,8 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     uint256 blockTime = _currentTime();
     _updateAwardBalance();
 
-    bool hasPrizeStrategy = _hasPrizeStrategy();
-    if (hasPrizeStrategy) {
-      unlockTimestamp = prizeStrategy.beforeWithdrawWithTimelockFrom(from, amount, controlledToken);
+    if (_hasPrizeStrategy()) {
+      unlockTimestamp = prizeStrategy.beforeWithdrawWithTimelockFrom(from, amount, controlledToken, data);
     }
 
     uint256 lockDuration = unlockTimestamp > blockTime ? unlockTimestamp.sub(blockTime) : 0;
@@ -252,32 +311,33 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
       unlockTimestamp = blockTime.add(maxTimelockDuration);
     }
 
-    address operator = _msgSender();
+    ControlledToken(controlledToken).controllerBurnFrom(_msgSender(), from, amount);
+    _mintTimelock(from, amount, unlockTimestamp);
 
-    ControlledToken(controlledToken).controllerBurnFrom(operator, from, amount);
-
-    // Sweep the old balance, if any
-    address[] memory users = new address[](1);
-    users[0] = from;
-    sweepTimelockBalances(users);
-
-    timelockTotalSupply = timelockTotalSupply.add(amount);
-    timelockBalances[from] = timelockBalances[from].add(amount);
-    unlockTimestamps[from] = unlockTimestamp;
-
-    // if the funds should already be unlocked
-    if (unlockTimestamp <= _currentTime()) {
-      sweepTimelockBalances(users);
+    if (_hasPrizeStrategy()) {
+      prizeStrategy.afterWithdrawWithTimelockFrom(from, amount, controlledToken, data);
     }
 
-    if (hasPrizeStrategy) {
-      prizeStrategy.afterWithdrawWithTimelockFrom(from, amount, controlledToken);
-    }
-
-    emit TimelockedWithdrawal(operator, from, controlledToken, amount, unlockTimestamp);
+    emit TimelockedWithdrawal(_msgSender(), from, controlledToken, amount, unlockTimestamp);
 
     // return the block at which the funds will be available
     return unlockTimestamp;
+  }
+
+  function _mintTimelock(address user, uint256 amount, uint256 timestamp) internal {
+    // Sweep the old balance, if any
+    address[] memory users = new address[](1);
+    users[0] = user;
+    sweepTimelockBalances(users);
+
+    timelockTotalSupply = timelockTotalSupply.add(amount);
+    timelockBalances[user] = timelockBalances[user].add(amount);
+    unlockTimestamps[user] = timestamp;
+
+    // if the funds should already be unlocked
+    if (timestamp <= _currentTime()) {
+      sweepTimelockBalances(users);
+    }
   }
 
   /// @notice Updates the Prize Strategy when Tickets are transferred between holders

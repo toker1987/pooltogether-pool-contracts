@@ -207,7 +207,7 @@ describe('PrizeStrategy', function() {
     it('should show the odds for a user to win the prize', async () => {
       const amount = toWei('10')
       await ticket.mock.balanceOf.withArgs(wallet._address).returns(amount)
-      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, amount, ticket.address)
+      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, amount, ticket.address, [])
       expect(await prizeStrategy.chanceOf(wallet._address)).to.be.equal(amount)
     })
   })
@@ -215,13 +215,13 @@ describe('PrizeStrategy', function() {
   describe('afterDepositTo()', () => {
     it('should only be called by the prize pool', async () => {
       prizeStrategy2 = await prizeStrategy.connect(wallet2)
-      await expect(prizeStrategy2.afterDepositTo(wallet._address, toWei('10'), ticket.address)).to.be.revertedWith('PrizeStrategy/only-prize-pool')
+      await expect(prizeStrategy2.afterDepositTo(wallet._address, toWei('10'), ticket.address, [])).to.be.revertedWith('PrizeStrategy/only-prize-pool')
     })
 
     it('should update the users ticket balance', async () => {
       await ticket.mock.totalSupply.returns('22')
       await ticket.mock.balanceOf.withArgs(wallet._address).returns(toWei('22'))
-      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address)
+      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, [])
       expect(await prizeStrategy.draw(1)).to.equal(wallet._address) // they exist in the sortition sum tree
     })
 
@@ -230,7 +230,7 @@ describe('PrizeStrategy', function() {
       await prizeStrategy.setCurrentTime(await prizeStrategy.prizePeriodEndAt());
       await prizeStrategy.startAward();
 
-      await expect(prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address))
+      await expect(prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, []))
         .to.be.revertedWith('PrizeStrategy/rng-in-flight');
     });
   });
@@ -250,7 +250,8 @@ describe('PrizeStrategy', function() {
           toWei('10'),
           ticket.address,
           toWei('0'),
-          toWei('0')
+          toWei('0'),
+          []
         ))
         .to.be.revertedWith('PrizeStrategy/rng-in-flight')
     });
@@ -299,10 +300,11 @@ describe('PrizeStrategy', function() {
       await expect(
         prizePool.call(
           prizeStrategy,
-          'afterWithdrawWithTimelockFrom(address,uint256,address)',
+          'afterWithdrawWithTimelockFrom(address,uint256,address,bytes)',
           wallet._address,
           toWei('10'),
-          ticket.address
+          ticket.address,
+          []
         ))
         .to.be.revertedWith('PrizeStrategy/rng-in-flight')
     })
@@ -325,6 +327,56 @@ describe('PrizeStrategy', function() {
         ticketBalance,
         interest
       )).to.equal(prizePeriodSeconds * 3 / exitFeeMantissa)
+    })
+  })
+
+  describe('completeAward()', () => {
+    it('should accrue credit to the winner', async () => {
+      debug('Setting time')
+
+      await prizeStrategy.setCurrentTime(await prizeStrategy.prizePeriodStartedAt());
+
+      debug('Calling afterDepositTo')
+      await ticket.mock.balanceOf.returns(toWei('10'))
+
+      // have the mock update the number of prize tickets
+      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, []);
+
+      // ensure prize period is over
+      await prizeStrategy.setCurrentTime(await prizeStrategy.prizePeriodEndAt());
+
+      // allow an rng request
+      await rng.mock.requestRandomNumber.returns('1', '1')
+
+      debug('Starting award...')
+
+      // start the award
+      await prizeStrategy.startAward()
+
+      // rng is done
+      await rng.mock.isRequestComplete.returns(true)
+      await rng.mock.randomNumber.returns('0x6c00000000000000000000000000000000000000000000000000000000000000')
+      // draw winner      
+      await ticket.mock.totalSupply.returns(toWei('10'))
+
+      // 1 dai to give
+      await prizePool.mock.awardBalance.returns(toWei('1'))
+
+      // no reserve
+      await governor.mock.reserve.returns(AddressZero) // no reserve
+      
+      await prizePool.mock.award.withArgs(wallet._address, toWei('1'), ticket.address).returns()
+
+      debug('Completing award...')
+
+      // complete the award
+      await prizeStrategy.completeAward()
+
+      // ensure new balance is correct
+      await ticket.mock.balanceOf.returns(toWei('11'))
+
+      expect(await call(prizeStrategy, 'balanceOfCredit', wallet._address)).to.equal(toWei('1.1'))
+
     })
   })
 });

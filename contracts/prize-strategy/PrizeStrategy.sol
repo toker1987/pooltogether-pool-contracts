@@ -193,7 +193,8 @@ contract PrizeStrategy is PrizeStrategyStorage,
   function beforeWithdrawInstantlyFrom(
     address from,
     uint256 amount,
-    address controlledToken
+    address controlledToken,
+    bytes calldata
   )
     external
     override
@@ -251,7 +252,8 @@ contract PrizeStrategy is PrizeStrategyStorage,
   function beforeWithdrawWithTimelockFrom(
     address user,
     uint256 amount,
-    address controlledToken
+    address controlledToken,
+    bytes calldata
   )
     external
     override
@@ -435,8 +437,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @param secondsPerBlockMantissa The seconds per block to use for the calculation.  Should be a fixed point 18 number like Ether.
   /// @return The estimated remaining prize
   function estimateRemainingPrizeWithBlockTime(uint256 secondsPerBlockMantissa) public view returns (uint256) {
-    uint256 accounted = prizePool.accountedBalance();
-    uint256 remainingBlocks = estimateRemainingBlocksToPrize(secondsPerBlockMantissa);
     uint256 remaining = prizePool.estimateAccruedInterestOverBlocks(
       prizePool.accountedBalance(),
       estimateRemainingBlocksToPrize(secondsPerBlockMantissa)
@@ -497,8 +497,9 @@ contract PrizeStrategy is PrizeStrategyStorage,
   function _awardTickets(address user, uint256 amount) internal {
     _accrueCredit(user, ticket.balanceOf(user));
     uint256 creditEarned = _calculateEarlyExitFee(amount);
-    creditBalances[user].balance = uint256(creditBalances[user].balance).add(uint256(creditEarned)).toUint128();
+    creditBalances[user].balance = uint256(creditBalances[user].balance).add(creditEarned).toUint128();
     prizePool.award(user, amount, address(ticket));
+
   }
 
   /// @notice Awards all external tokens with non-zero balances to the given user.  The external tokens must be held by the PrizePool contract.
@@ -552,7 +553,11 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @param to The user who deposited collateral
   /// @param amount The amount of collateral they deposited
   /// @param controlledToken The type of collateral they deposited
-  function afterDepositTo(address to, uint256 amount, address controlledToken) external override onlyPrizePool requireNotLocked {
+  function afterDepositTo(
+    address to,
+    uint256 amount,
+    address controlledToken,
+    bytes calldata) external override onlyPrizePool requireNotLocked {
     _afterDepositTo(to, amount, controlledToken);
   }
 
@@ -564,7 +569,8 @@ contract PrizeStrategy is PrizeStrategyStorage,
     address,
     address to,
     uint256 amount,
-    address controlledToken
+    address controlledToken,
+    bytes calldata
   )
     external
     override
@@ -589,7 +595,17 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @notice Called by the prize pool after a withdrawal with timelock has been made.
   /// @param from The user who withdrew
   /// @param controlledToken The type of collateral that was withdrawn
-  function afterWithdrawWithTimelockFrom(address from, uint256, address controlledToken) external override onlyPrizePool requireNotLocked {
+  function afterWithdrawWithTimelockFrom(
+    address from,
+    uint256,
+    address controlledToken,
+    bytes calldata data
+  )
+    external
+    override
+    onlyPrizePool
+    requireNotLocked
+  {
     if (controlledToken == address(ticket)) {
       uint256 fromBalance = ticket.balanceOf(from);
       sortitionSumTrees.set(TREE_KEY, fromBalance, bytes32(uint256(from)));
@@ -605,7 +621,8 @@ contract PrizeStrategy is PrizeStrategyStorage,
     uint256,
     address controlledToken,
     uint256,
-    uint256
+    uint256,
+    bytes calldata
   )
     external
     override
