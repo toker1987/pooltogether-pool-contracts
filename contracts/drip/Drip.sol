@@ -17,30 +17,35 @@ library Drip {
 
   struct State {
     uint256 dripRatePerBlock;
-    uint256 drippedTotalSupply;
-    mapping(address => UserState) userStates;
     uint128 exchangeRateMantissa;
     uint32 blockNumber;
+    mapping(address => UserState) userStates;
   }
 
-  function initialize(State storage self, uint256 currentBlockNumber) internal {
+  function initialize(State storage self, uint256 currentBlock) internal {
     self.exchangeRateMantissa = FixedPoint.SCALE.toUint128();
-    self.blockNumber = currentBlockNumber.toUint32();
+    self.blockNumber = currentBlock.toUint32();
   }
 
-  function updateExchangeRate(State storage self, uint256 measureTotalSupply, uint256 currentBlockNumber) internal {
+  function updateExchangeRate(
+    State storage self,
+    uint256 measureTotalSupply,
+    uint256 currentBlock
+  ) internal {
     // this should only run once per block.
-    if (self.blockNumber == uint32(currentBlockNumber)) {
+    if (self.blockNumber == uint32(currentBlock)) {
       return;
     }
 
-    uint256 newBlocks = currentBlockNumber.sub(self.blockNumber);
-    uint256 newTokens = newBlocks.mul(self.dripRatePerBlock);
-    uint256 indexDeltaMantissa = FixedPoint.calculateMantissa(newTokens, measureTotalSupply);
+    uint256 newBlocks = currentBlock.sub(self.blockNumber);
 
-    if (indexDeltaMantissa > 0) {
+    if (newBlocks > 0 && self.dripRatePerBlock > 0) {
+      uint256 newTokens = newBlocks.mul(self.dripRatePerBlock);
+      uint256 indexDeltaMantissa = measureTotalSupply > 0 ? FixedPoint.calculateMantissa(newTokens, measureTotalSupply) : 0;
       self.exchangeRateMantissa = uint256(self.exchangeRateMantissa).add(indexDeltaMantissa).toUint128();
-      self.blockNumber = currentBlockNumber.toUint32();
+      self.blockNumber = currentBlock.toUint32();
+    } else {
+      self.blockNumber = currentBlock.toUint32();
     }
   }
 
@@ -49,10 +54,21 @@ library Drip {
     address user,
     uint256 userMeasureBalance,
     uint256 measureTotalSupply,
-    uint256 availableDripTokenSupply,
-    uint256 currentBlockNumber
+    uint256 currentBlock
   ) internal returns (uint256) {
-    updateExchangeRate(self, measureTotalSupply, currentBlockNumber);
+    updateExchangeRate(self, measureTotalSupply, currentBlock);
+    return dripUser(
+      self,
+      user,
+      userMeasureBalance
+    );
+  }
+
+  function dripUser(
+    State storage self,
+    address user,
+    uint256 userMeasureBalance
+  ) internal returns (uint256) {
     UserState storage userState = self.userStates[user];
     uint256 lastExchangeRateMantissa = userState.lastExchangeRateMantissa;
     if (lastExchangeRateMantissa == 0) {
@@ -60,19 +76,8 @@ library Drip {
       lastExchangeRateMantissa = self.exchangeRateMantissa;
     }
 
-    // How many tokens we held previously
-    uint256 oldTokens = FixedPoint.multiplyUintByMantissa(userMeasureBalance, lastExchangeRateMantissa);
-
-    // How many tokens should we now hold?
-    uint256 currentTokens = FixedPoint.multiplyUintByMantissa(userMeasureBalance, self.exchangeRateMantissa);
-
-    // calculate the difference
-    uint256 newTokens = currentTokens > oldTokens ? currentTokens.sub(oldTokens) : 0;
-
-    if (newTokens > availableDripTokenSupply) {
-      newTokens = availableDripTokenSupply;
-    }
-
+    uint256 deltaExchangeRateMantissa = uint256(self.exchangeRateMantissa).sub(lastExchangeRateMantissa);
+    uint256 newTokens = FixedPoint.multiplyUintByMantissa(userMeasureBalance, deltaExchangeRateMantissa);
     self.userStates[user] = UserState({
       lastExchangeRateMantissa: self.exchangeRateMantissa,
       dripBalance: uint256(userState.dripBalance).add(newTokens).toUint128()

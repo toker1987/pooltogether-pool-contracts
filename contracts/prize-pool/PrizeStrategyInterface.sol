@@ -24,7 +24,7 @@ interface PrizeStrategyInterface {
   /// @param to The address of the account who is receiving the deposit
   /// @param amount The amount of the deposit to account for
   /// @param controlledToken The address of the token that was deposited
-  function afterTimelockDepositTo(address operator, address to, uint256 amount, address controlledToken) external;
+  function afterTimelockDepositTo(address operator, address to, uint256 amount, address controlledToken, bytes calldata data) external;
 
   /// @dev Inheriting contract must provide a view into the unlock timestamp for a timelocked withdrawal
   /// @param from The address of the account to withdraw from

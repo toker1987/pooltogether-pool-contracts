@@ -204,7 +204,7 @@ describe('PrizeStrategy', function() {
   })
 
   describe('chanceOf()', () => {
-    it('should show the odds for a user to win the prize', async () => {
+    it.only('should show the odds for a user to win the prize', async () => {
       const amount = toWei('10')
       await ticket.mock.balanceOf.withArgs(wallet._address).returns(amount)
       await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, amount, ticket.address, [])
@@ -331,7 +331,7 @@ describe('PrizeStrategy', function() {
   })
 
   describe('completeAward()', () => {
-    it('should accrue credit to the winner', async () => {
+    it.only('should accrue credit to the winner', async () => {
       debug('Setting time')
 
       await prizeStrategy.setCurrentTime(await prizeStrategy.prizePeriodStartedAt());

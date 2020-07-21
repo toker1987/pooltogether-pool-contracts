@@ -9,6 +9,7 @@ import "../token/TokenControllerInterface.sol";
 import "../token/ControlledToken.sol";
 import "../prize-pool/PrizePool.sol";
 import "../Constants.sol";
+import "../drip/DripManager.sol";
 
 contract PrizeStrategyStorage {
   struct Credit {
@@ -42,4 +43,8 @@ contract PrizeStrategyStorage {
   uint256 public exitFeeMantissa;
 
   uint256 public creditRateMantissa;
+
+  ControlledToken referral;
+
+  DripManager.State dripManager;
 }

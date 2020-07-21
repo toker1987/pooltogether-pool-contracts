@@ -19,14 +19,12 @@ contract DripExposed {
     address user,
     uint256 userMeasureBalance,
     uint256 measureTotalSupply,
-    uint256 availableTokenSupply,
     uint256 currentBlockNumber
   ) external {
     dripState.drip(
       user,
       userMeasureBalance,
       measureTotalSupply,
-      availableTokenSupply,
       currentBlockNumber
     );
   }
@@ -40,10 +38,6 @@ contract DripExposed {
 
   function balanceOf(address user) external view returns (uint256) {
     return dripState.userStates[user].dripBalance;
-  }
-
-  function totalSupply() external view returns (uint256) {
-    return dripState.drippedTotalSupply;
   }
 
   function exchangeRateMantissa() external view returns (uint256) {

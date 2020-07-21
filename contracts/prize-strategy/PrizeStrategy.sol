@@ -4,7 +4,6 @@ import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/SafeCast.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/introspection/IERC1820Registry.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/ReentrancyGuard.sol";
 import "@opengsn/gsn/contracts/BaseRelayRecipient.sol";
@@ -26,13 +25,13 @@ contract PrizeStrategy is PrizeStrategyStorage,
                           OwnableUpgradeSafe,
                           BaseRelayRecipient,
                           ReentrancyGuardUpgradeSafe,
-                          PrizeStrategyInterface,
-                          IERC777Recipient {
+                          PrizeStrategyInterface {
 
   using SafeMath for uint256;
   using SafeCast for uint256;
   using SortitionSumTreeFactory for SortitionSumTreeFactory.SortitionSumTrees;
   using MappedSinglyLinkedList for MappedSinglyLinkedList.Mapping;
+  using DripManager for DripManager.State;
 
   bytes32 constant private TREE_KEY = keccak256("PoolTogether/Ticket");
   uint256 constant private MAX_TREE_LEAVES = 5;
@@ -557,8 +556,14 @@ contract PrizeStrategy is PrizeStrategyStorage,
     address to,
     uint256 amount,
     address controlledToken,
-    bytes calldata) external override onlyPrizePool requireNotLocked {
-    _afterDepositTo(to, amount, controlledToken);
+    bytes calldata data
+  )
+    external
+    override
+    onlyPrizePool
+    requireNotLocked
+  {
+    _afterDepositTo(to, amount, controlledToken, data);
   }
 
   /// @notice Called by the prize pool after a deposit has been made.
@@ -577,19 +582,43 @@ contract PrizeStrategy is PrizeStrategyStorage,
     onlyPrizePool
     requireNotLocked
   {
-    _afterDepositTo(to, amount, controlledToken);
+    _afterDepositTo(to, amount, controlledToken, "");
   }
 
   /// @notice Called by the prize pool after a deposit has been made.
   /// @param to The user who deposited collateral
   /// @param amount The amount of collateral they deposited
   /// @param controlledToken The type of collateral they deposited
-  function _afterDepositTo(address to, uint256 amount, address controlledToken) internal {
+  function _afterDepositTo(address to, uint256 amount, address controlledToken, bytes memory data) internal {
+    dripManager.updateDrips(controlledToken, to, _currentBlock());
+
     if (controlledToken == address(ticket)) {
       uint256 toBalance = ticket.balanceOf(to);
       _accrueCredit(to, toBalance.sub(amount));
       sortitionSumTrees.set(TREE_KEY, toBalance, bytes32(uint256(to)));
     }
+
+    if (data.length > 0) {
+      (address referrer) = abi.decode(data, (address));
+      _mintReferral(referrer, amount);
+    }
+  }
+
+  function _mintReferral(address referrer, uint256 amount) internal {
+    dripManager.updateDrips(address(referral), referrer, _currentBlock());
+    referral.controllerMint(referrer, amount);
+  }
+
+  function addDripToken(address measure, address dripToken, uint256 dripRatePerBlock) external onlyOwner {
+    dripManager.addDripToken(measure, dripToken, dripRatePerBlock, _currentBlock());
+  }
+
+  function setDripRate(address measure, address dripToken, uint256 dripRatePerBlock) external onlyOwner {
+    dripManager.setDripRate(measure, dripToken, dripRatePerBlock);
+  }
+
+  function claimDrip(address user, address measure, address dripToken) external {
+    dripManager.claimDrip(user, measure, dripToken);
   }
 
   /// @notice Called by the prize pool after a withdrawal with timelock has been made.
@@ -599,7 +628,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
     address from,
     uint256,
     address controlledToken,
-    bytes calldata data
+    bytes calldata
   )
     external
     override
@@ -646,6 +675,12 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @return The current time (block.timestamp)
   function _currentTime() internal virtual view returns (uint256) {
     return block.timestamp;
+  }
+
+  /// @notice returns the current time.  Used for testing.
+  /// @return The current time (block.timestamp)
+  function _currentBlock() internal virtual view returns (uint256) {
+    return block.number;
   }
 
   /// @notice Returns the credit balance for a given user.  Not that this includes both minted credit and pending credit.
@@ -765,17 +800,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
 
   function getLastRngRequestId() public view returns (uint32) {
     return rngRequest.id;
-  }
-
-  /// @notice Called by an ERC777 token after tokens have been received.
-  function tokensReceived(
-    address operator,
-    address from,
-    address to,
-    uint256 amount,
-    bytes calldata userData,
-    bytes calldata operatorData
-  ) external override {
   }
 
 }
