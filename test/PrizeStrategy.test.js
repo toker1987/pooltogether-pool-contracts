@@ -22,7 +22,7 @@ let overrides = { gasLimit: 20000000 }
 describe('PrizeStrategy', function() {
   let wallet, wallet2
 
-  let registry, governor, prizePool, prizeStrategy, token, externalAward
+  let registry, governor, prizePool, prizeStrategy, token, referral, externalAward
 
   let ticket, sponsorship, rng
 
@@ -47,6 +47,7 @@ describe('PrizeStrategy', function() {
     prizePool = await deployMockContract(wallet, PrizePool.abi, overrides)
     ticket = await deployMockContract(wallet, ControlledToken.abi, overrides)
     sponsorship = await deployMockContract(wallet, ControlledToken.abi, overrides)
+    referral = await deployMockContract(wallet, ControlledToken.abi, overrides)
     rng = await deployMockContract(wallet, RNGInterface.abi, overrides)
     externalAward = await deployMockContract(wallet, IERC20.abi, overrides)
 
@@ -64,9 +65,17 @@ describe('PrizeStrategy', function() {
       ticket.address,
       sponsorship.address,
       rng.address,
-      toWei('' + exitFeeMantissa),
-      toWei('' + creditRateMantissa).div(prizePeriodSeconds),
-      [externalAward.address]
+      referral.address,
+      [externalAward.address],
+      []
+    )
+
+    await prizeStrategy.setExitFeeMantissa(
+      toWei('0.1'),
+    )
+
+    await prizeStrategy.setCreditRateMantissa(
+      toWei('0.1').div(prizePeriodSeconds)
     )
 
     debug('initialized!')
@@ -204,9 +213,10 @@ describe('PrizeStrategy', function() {
   })
 
   describe('chanceOf()', () => {
-    it.only('should show the odds for a user to win the prize', async () => {
+    it('should show the odds for a user to win the prize', async () => {
       const amount = toWei('10')
       await ticket.mock.balanceOf.withArgs(wallet._address).returns(amount)
+      await ticket.mock.totalSupply.returns(amount)
       await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, amount, ticket.address, [])
       expect(await prizeStrategy.chanceOf(wallet._address)).to.be.equal(amount)
     })
@@ -233,6 +243,15 @@ describe('PrizeStrategy', function() {
       await expect(prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, []))
         .to.be.revertedWith('PrizeStrategy/rng-in-flight');
     });
+
+    it.only('should be aware of referrals', async () => {
+      debug('Calling afterDepositTo')
+      await referral.mock.controllerMint.withArgs(wallet2._address, toWei('10'))
+      await ticket.mock.balanceOf.returns(toWei('10'))
+      await ticket.mock.totalSupply.returns(toWei('10'))
+
+      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, ethers.utils.defaultAbiCoder.encode(['address'], [wallet2._address]))
+    })
   });
 
   describe('afterWithdrawInstantlyFrom()', () => {
@@ -331,13 +350,14 @@ describe('PrizeStrategy', function() {
   })
 
   describe('completeAward()', () => {
-    it.only('should accrue credit to the winner', async () => {
+    it('should accrue credit to the winner', async () => {
       debug('Setting time')
 
       await prizeStrategy.setCurrentTime(await prizeStrategy.prizePeriodStartedAt());
 
       debug('Calling afterDepositTo')
       await ticket.mock.balanceOf.returns(toWei('10'))
+      await ticket.mock.totalSupply.returns(toWei('10'))
 
       // have the mock update the number of prize tickets
       await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, []);

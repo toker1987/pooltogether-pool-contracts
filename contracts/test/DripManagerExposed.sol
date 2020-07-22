@@ -9,8 +9,14 @@ contract DripManagerExposed {
 
   DripManager.State dripManager;
 
-  function updateDrips(address measure, address user, uint256 blockNumber) external {
-    dripManager.updateDrips(measure, user, blockNumber);
+  function updateDrips(
+    address measure,
+    address user,
+    uint256 measureBalance,
+    uint256 measureTotalSupply,
+    uint256 blockNumber
+  ) external {
+    dripManager.updateDrips(measure, user, measureBalance, measureTotalSupply, blockNumber);
   }
 
   function addDripToken(address measure, address dripToken, uint256 dripRatePerBlock, uint256 blockNumber) external {

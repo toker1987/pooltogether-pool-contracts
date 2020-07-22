@@ -19,10 +19,10 @@ library DripManager {
     State storage self,
     address measure,
     address user,
+    uint256 measureBalance,
+    uint256 measureTotalSupply,
     uint256 currentBlockNumber
   ) internal {
-    uint256 measureBalance = IERC20(measure).balanceOf(user);
-    uint256 measureTotalSupply = IERC20(measure).totalSupply();
     address currentDripToken = self.dripTokens[measure].addressMap[MappedSinglyLinkedList.SENTINAL_TOKEN];
     while (currentDripToken != address(0) && currentDripToken != MappedSinglyLinkedList.SENTINAL_TOKEN) {
       Drip.State storage dripState = self.drips[measure][currentDripToken];
@@ -68,11 +68,12 @@ library DripManager {
     return dripState.userStates[user].dripBalance;
   }
 
-  function claimDrip(State storage self, address user, address measure, address dripToken) internal {
+  function claimDrip(State storage self, address user, address measure, address dripToken) internal returns (uint256) {
     Drip.State storage dripState = self.drips[measure][dripToken];
     uint256 balance = dripState.userStates[user].dripBalance;
     dripState.burnDrip(user, balance);
     IERC20(dripToken).transfer(user, balance);
+    return balance;
   }
 
   function batchClaimDrip(State storage self, address user, address[] memory measures, address dripToken) internal {

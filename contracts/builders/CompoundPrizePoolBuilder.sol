@@ -76,18 +76,16 @@ contract CompoundPrizePoolBuilder is Initializable {
 
     prizePool.transferOwnership(msg.sender);
 
-    prizeStrategy.initialize(
-      trustedForwarder,
-      governor,
+    initializePrizeStrategy(
+      prizeStrategy,
       config.prizePeriodSeconds,
+      config.externalAwards,
       prizePool,
-      tokens[0],
-      tokens[1],
-      rng,
-      config.exitFeeMantissa,
-      config.creditRateMantissa,
-      config.externalAwards
+      tokens
     );
+
+    prizeStrategy.setExitFeeMantissa(config.exitFeeMantissa);
+    prizeStrategy.setCreditRateMantissa(config.creditRateMantissa);
 
     prizeStrategy.transferOwnership(msg.sender);
 
@@ -98,6 +96,26 @@ contract CompoundPrizePoolBuilder is Initializable {
     );
 
     return prizeStrategy;
+  }
+
+  function initializePrizeStrategy(
+    PrizeStrategy prizeStrategy,
+    uint256 prizePeriodSeconds,
+    address[] memory externalAwards,
+    CompoundPrizePool prizePool,
+    address[] memory tokens
+  ) internal {
+    prizeStrategy.initialize(
+      trustedForwarder,
+      governor,
+      prizePeriodSeconds,
+      prizePool,
+      tokens[0],
+      tokens[1],
+      rng,
+      createControlledToken(prizeStrategy, "Referrals", "REFS"),
+      externalAwards
+    );
   }
 
   function createPrizePoolAndTokens(

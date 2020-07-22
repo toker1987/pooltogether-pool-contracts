@@ -10,6 +10,7 @@ import "../token/ControlledToken.sol";
 import "../prize-pool/PrizePool.sol";
 import "../Constants.sol";
 import "../drip/DripManager.sol";
+import "../drip/PeriodicShare.sol";
 
 contract PrizeStrategyStorage {
   struct Credit {
@@ -42,9 +43,10 @@ contract PrizeStrategyStorage {
 
   uint256 public exitFeeMantissa;
 
-  uint256 public creditRateMantissa;
+  MappedSinglyLinkedList.Mapping internal referralPeriodicShareKeys;
+  mapping(address => PeriodicShare.State) referralPeriodicShares;
 
-  ControlledToken referral;
+  uint256 public creditRateMantissa;
 
   DripManager.State dripManager;
 }
