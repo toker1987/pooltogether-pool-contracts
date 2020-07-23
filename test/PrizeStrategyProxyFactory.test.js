@@ -3,6 +3,8 @@ const PrizeStrategyProxyFactory = require('../build/PrizeStrategyProxyFactory.js
 const buidler = require('./helpers/buidler')
 const { deployContract } = require('ethereum-waffle')
 
+let overrides = { gasLimit: 20000000 }
+
 describe('PrizeStrategyProxyFactory', () => {
 
   let wallet, wallet2
@@ -13,8 +15,8 @@ describe('PrizeStrategyProxyFactory', () => {
     [wallet, wallet2] = await buidler.ethers.getSigners()
     provider = buidler.ethers.provider
 
-    factory = await deployContract(wallet, PrizeStrategyProxyFactory, [])
-    await factory.initialize()
+    factory = await deployContract(wallet, PrizeStrategyProxyFactory, [], overrides)
+    await factory.initialize(overrides)
   })
 
   describe('create()', () => {

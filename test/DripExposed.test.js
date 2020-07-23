@@ -1,5 +1,5 @@
-const { deployContract, deployMockContract } = require('ethereum-waffle')
-const DripExposed = require('../build/DripExposed.json')
+const { deployContract } = require('ethereum-waffle')
+const BalanceDripExposed = require('../build/BalanceDripExposed.json')
 
 const { ethers } = require('./helpers/ethers')
 const { expect } = require('chai')
@@ -8,18 +8,18 @@ const { AddressZero } = require('ethers/constants')
 
 const toWei = ethers.utils.parseEther
 
-const debug = require('debug')('ptv3:DripExposed.test')
+const debug = require('debug')('ptv3:BalanceDripExposed.test')
 
 let overrides = { gasLimit: 20000000 }
 
-describe('DripExposed', function() {
+describe('BalanceDripExposed', function() {
 
   let dripExposed
 
   beforeEach(async () => {
     [wallet, wallet2, wallet3, wallet4] = await buidler.ethers.getSigners()
     
-    dripExposed = await deployContract(wallet, DripExposed, [], overrides)
+    dripExposed = await deployContract(wallet, BalanceDripExposed, [], overrides)
 
     // current block is one
     await dripExposed.initialize(toWei('0.1'), 1)

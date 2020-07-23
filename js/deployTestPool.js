@@ -78,10 +78,11 @@ async function deployTestPool({
     ticket.address,
     sponsorship.address,
     rng.address,
-    exitFee || toWei('0.1'),
-    creditRate || toWei('0.1').div(prizePeriodSeconds),
     externalAwards
   )
+
+  await prizeStrategy.setExitFeeMantissa(exitFee || toWei('0.1'))
+  await prizeStrategy.setCreditRateMantissa(creditRate || toWei('0.1').div(prizePeriodSeconds))
 
   debug("Addresses: \n", {
     rng: rng.address,

@@ -1,5 +1,5 @@
 const { deployContract, deployMockContract } = require('ethereum-waffle')
-const DripManagerExposed = require('../build/DripManagerExposed.json')
+const BalanceDripManagerExposed = require('../build/BalanceDripManagerExposed.json')
 const ERC20Mintable = require('../build/ERC20Mintable.json')
 
 const { ethers } = require('./helpers/ethers')
@@ -9,11 +9,11 @@ const { AddressZero } = require('ethers/constants')
 
 const toWei = ethers.utils.parseEther
 
-const debug = require('debug')('ptv3:DripManagerExposed.test')
+const debug = require('debug')('ptv3:BalanceDripManagerExposed.test')
 
 let overrides = { gasLimit: 20000000 }
 
-describe('DripManagerExposed', function() {
+describe('BalanceDripManagerExposed', function() {
 
   let dripExposed
 
@@ -22,7 +22,7 @@ describe('DripManagerExposed', function() {
   beforeEach(async () => {
     [wallet, wallet2, wallet3, wallet4] = await buidler.ethers.getSigners()
     
-    dripExposed = await deployContract(wallet, DripManagerExposed, [], overrides)
+    dripExposed = await deployContract(wallet, BalanceDripManagerExposed, [], overrides)
 
     debug({ dripExposed: dripExposed.address })
 
@@ -65,12 +65,12 @@ describe('DripManagerExposed', function() {
       await measure.mint(wallet._address, toWei('100'))
 
       // first drip should do nothing
-      await dripExposed.updateDrips(measure.address, wallet._address, '2')
+      await dripExposed.updateDrips(measure.address, wallet._address, measure.balanceOf(wallet._address), measure.totalSupply(), '2')
       // user should not have accrued
       expect(await dripExposed.balanceOfDrip(wallet._address, measure.address, drip1.address)).to.equal(toWei('0'))
 
       // next drip should accrue their max share
-      await dripExposed.updateDrips(measure.address, wallet._address, '3')
+      await dripExposed.updateDrips(measure.address, wallet._address, measure.balanceOf(wallet._address), measure.totalSupply(), '3')
       // user should accrue the total per block
       expect(await dripExposed.balanceOfDrip(wallet._address, measure.address, drip1.address)).to.equal(toWei('0.001'))
 
@@ -78,7 +78,7 @@ describe('DripManagerExposed', function() {
       await measure.mint(wallet2._address, toWei('100'))
 
       // next drip should accrue *half* of whats available
-      await dripExposed.updateDrips(measure.address, wallet._address, '4')
+      await dripExposed.updateDrips(measure.address, wallet._address, measure.balanceOf(wallet2._address), measure.totalSupply(), '4')
       expect(await dripExposed.balanceOfDrip(wallet._address, measure.address, drip1.address)).to.equal(toWei('0.0015'))
     })
   })
@@ -93,9 +93,9 @@ describe('DripManagerExposed', function() {
       await measure.mint(wallet._address, toWei('100'))
 
       // first drip should do nothing
-      await dripExposed.updateDrips(measure.address, wallet._address, '2')
+      await dripExposed.updateDrips(measure.address, wallet._address, measure.balanceOf(wallet._address), measure.totalSupply(), '2')
       // next drip should accrue their max share
-      await dripExposed.updateDrips(measure.address, wallet._address, '3')
+      await dripExposed.updateDrips(measure.address, wallet._address, measure.balanceOf(wallet._address), measure.totalSupply(), '3')
       // user should accrue the total per block
       expect(await dripExposed.balanceOfDrip(wallet._address, measure.address, drip1.address)).to.equal(toWei('0.001'))
 

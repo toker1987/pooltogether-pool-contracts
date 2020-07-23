@@ -22,7 +22,7 @@ let overrides = { gasLimit: 20000000 }
 describe('PrizeStrategy', function() {
   let wallet, wallet2
 
-  let registry, governor, prizePool, prizeStrategy, token, referral, externalAward
+  let registry, governor, prizePool, prizeStrategy, token, externalAward
 
   let ticket, sponsorship, rng
 
@@ -47,7 +47,6 @@ describe('PrizeStrategy', function() {
     prizePool = await deployMockContract(wallet, PrizePool.abi, overrides)
     ticket = await deployMockContract(wallet, ControlledToken.abi, overrides)
     sponsorship = await deployMockContract(wallet, ControlledToken.abi, overrides)
-    referral = await deployMockContract(wallet, ControlledToken.abi, overrides)
     rng = await deployMockContract(wallet, RNGInterface.abi, overrides)
     externalAward = await deployMockContract(wallet, IERC20.abi, overrides)
 
@@ -65,7 +64,6 @@ describe('PrizeStrategy', function() {
       ticket.address,
       sponsorship.address,
       rng.address,
-      referral.address,
       [externalAward.address],
       []
     )
@@ -102,8 +100,6 @@ describe('PrizeStrategy', function() {
         ticket.address,
         sponsorship.address,
         rng.address,
-        toWei('0.1'),
-        toWei('0.1').div(prizePeriodSeconds),
         [invalidExternalToken]
       ]
 
@@ -229,7 +225,7 @@ describe('PrizeStrategy', function() {
     })
 
     it('should update the users ticket balance', async () => {
-      await ticket.mock.totalSupply.returns('22')
+      await ticket.mock.totalSupply.returns(toWei('22'))
       await ticket.mock.balanceOf.withArgs(wallet._address).returns(toWei('22'))
       await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, [])
       expect(await prizeStrategy.draw(1)).to.equal(wallet._address) // they exist in the sortition sum tree
@@ -243,15 +239,6 @@ describe('PrizeStrategy', function() {
       await expect(prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, []))
         .to.be.revertedWith('PrizeStrategy/rng-in-flight');
     });
-
-    it.only('should be aware of referrals', async () => {
-      debug('Calling afterDepositTo')
-      await referral.mock.controllerMint.withArgs(wallet2._address, toWei('10'))
-      await ticket.mock.balanceOf.returns(toWei('10'))
-      await ticket.mock.totalSupply.returns(toWei('10'))
-
-      await prizePool.call(prizeStrategy, 'afterDepositTo', wallet._address, toWei('10'), ticket.address, ethers.utils.defaultAbiCoder.encode(['address'], [wallet2._address]))
-    })
   });
 
   describe('afterWithdrawInstantlyFrom()', () => {
@@ -354,6 +341,9 @@ describe('PrizeStrategy', function() {
       debug('Setting time')
 
       await prizeStrategy.setCurrentTime(await prizeStrategy.prizePeriodStartedAt());
+
+      // no external award
+      await externalAward.mock.balanceOf.withArgs(prizePool.address).returns('0')
 
       debug('Calling afterDepositTo')
       await ticket.mock.balanceOf.returns(toWei('10'))

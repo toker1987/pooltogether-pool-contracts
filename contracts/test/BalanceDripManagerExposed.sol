@@ -2,12 +2,12 @@ pragma solidity ^0.6.4;
 
 import "@nomiclabs/buidler/console.sol";
 
-import "../drip/DripManager.sol";
+import "../drip/BalanceDripManager.sol";
 
-contract DripManagerExposed {
-  using DripManager for DripManager.State;
+contract BalanceDripManagerExposed {
+  using BalanceDripManager for BalanceDripManager.State;
 
-  DripManager.State dripManager;
+  BalanceDripManager.State dripManager;
 
   function updateDrips(
     address measure,
@@ -47,7 +47,7 @@ contract DripManagerExposed {
       uint32 blockNumber
     )
   {
-    Drip.State storage dripState = dripManager.getDrip(measure, dripToken);
+    BalanceDrip.State storage dripState = dripManager.getDrip(measure, dripToken);
     dripRatePerBlock = dripState.dripRatePerBlock;
     exchangeRateMantissa = dripState.exchangeRateMantissa;
     blockNumber = dripState.blockNumber;

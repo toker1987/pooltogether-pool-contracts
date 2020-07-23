@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-ethereum-package/contracts/utils/SafeCast.sol";
 import "@pooltogether/fixed-point/contracts/FixedPoint.sol";
 import "@nomiclabs/buidler/console.sol";
 
-library Drip {
+library BalanceDrip {
   using SafeMath for uint256;
   using SafeCast for uint256;
 

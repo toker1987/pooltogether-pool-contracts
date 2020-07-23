@@ -25,14 +25,13 @@ contract PrizeStrategy is PrizeStrategyStorage,
                           OwnableUpgradeSafe,
                           BaseRelayRecipient,
                           ReentrancyGuardUpgradeSafe,
-                          PrizeStrategyInterface,
-                          TokenControllerInterface {
+                          PrizeStrategyInterface {
 
   using SafeMath for uint256;
   using SafeCast for uint256;
   using SortitionSumTreeFactory for SortitionSumTreeFactory.SortitionSumTrees;
   using MappedSinglyLinkedList for MappedSinglyLinkedList.Mapping;
-  using DripManager for DripManager.State;
+  using BalanceDripManager for BalanceDripManager.State;
 
   bytes32 constant private TREE_KEY = keccak256("PoolTogether/Ticket");
   uint256 constant private MAX_TREE_LEAVES = 5;
@@ -73,7 +72,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
     address _ticket,
     address _sponsorship,
     RNGInterface _rng,
-    ControlledToken _referral,
     address[] memory _externalAwards
   ) public initializer {
     require(address(_governor) != address(0), "PrizeStrategy/governor-not-zero");
@@ -82,8 +80,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
     require(address(_ticket) != address(0), "PrizeStrategy/ticket-not-zero");
     require(address(_sponsorship) != address(0), "PrizeStrategy/sponsorship-not-zero");
     require(address(_rng) != address(0), "PrizeStrategy/rng-not-zero");
-    require(address(_referral) != address(0), "PrizeStrategy/referral-not-zero");
-    referral = _referral;
     prizePool = _prizePool;
     ticket = IERC20(_ticket);
     rng = _rng;
@@ -511,8 +507,8 @@ contract PrizeStrategy is PrizeStrategyStorage,
       uint256 balance = IERC20(currentToken).balanceOf(address(prizePool));
       if (balance > 0) {
         prizePool.awardExternal(winner, balance, currentToken);
-        currentToken = externalAwardMapping.addressMap[currentToken];
       }
+      currentToken = externalAwardMapping.addressMap[currentToken];
     }
   }
 
@@ -592,8 +588,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @param amount The amount of collateral they deposited
   /// @param controlledToken The type of collateral they deposited
   function _afterDepositTo(address to, uint256 amount, address controlledToken, bytes memory data) internal {
-    dripManager.updateDrips(controlledToken, to, _currentBlock());
-
     uint256 balance = IERC20(controlledToken).balanceOf(to);
     uint256 oldBalance = balance.sub(amount);
     uint256 totalSupply = IERC20(controlledToken).totalSupply();
@@ -622,20 +616,20 @@ contract PrizeStrategy is PrizeStrategyStorage,
     console.log("updateDrips...");
     // dripManager.updateDrips(address(referral), referrer, _currentBlock());
     console.log("controllerMint...");
-    _updateReferralPeriodicShares();
+    _updateReferralVolumeDrips();
 
   }
 
-  function _updateReferralPeriodicShares() internal {
-    uint256 currentTime = _currentTime();
-    address referralPeriodicShareKey = referralPeriodicShares.addressMap[MappedSinglyLinkedList.SENTINAL_TOKEN];
-    while (referralPeriodicShareKey != address(0) && referralPeriodicShareKey != MappedSinglyLinkedList.SENTINAL_TOKEN) {
-      PeriodicShare.State storage periodicShare = referralPeriodicShares[referralPeriodicShareKey];
-      if (periodicShare.isPeriodOver(currentTime)) {
-        dripManager.updateDrips(referralPeriodicShareKey, referralPeriodicShareKey, 1 ether, 1 ether, _currentBlock());
-      }
-      // just drip everything out to the periodic shares
-    }
+  function _updateReferralVolumeDrips() internal {
+    // uint256 currentTime = _currentTime();
+    // address referralVolumeDripKey = referralVolumeDrips.addressMap[MappedSinglyLinkedList.SENTINAL_TOKEN];
+    // while (referralVolumeDripKey != address(0) && referralVolumeDripKey != MappedSinglyLinkedList.SENTINAL_TOKEN) {
+    //   VolumeDrip.State storage periodicShare = referralVolumeDrips[referralVolumeDripKey];
+    //   if (periodicShare.isPeriodOver(currentTime)) {
+    //     dripManager.updateDrips(referralVolumeDripKey, referralVolumeDripKey, 1 ether, 1 ether, _currentBlock());
+    //   }
+    //   // just drip everything out to the periodic shares
+    // }
   }
 
   function addDripToken(address measure, address dripToken, uint256 dripRatePerBlock) external onlyOwner {
@@ -650,7 +644,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
     dripManager.claimDrip(user, measure, dripToken);
   }
 
-  function claimPeriodicShare(address user, address periodicShareKey, address dripToken) external {
+  function claimVolumeDrip(address user, address periodicShareKey, address dripToken) external {
 
   }
 
@@ -833,12 +827,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
 
   function getLastRngRequestId() public view returns (uint32) {
     return rngRequest.id;
-  }
-
-  function beforeTokenTransfer(address, address, uint256) external override {
-    if (msg.sender == address(referral)) {
-      revert("PrizeStrategy/no-transfers");
-    }
   }
 
 }

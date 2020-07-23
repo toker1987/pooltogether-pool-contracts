@@ -4,7 +4,7 @@ import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/SafeCast.sol";
 import "@pooltogether/fixed-point/contracts/FixedPoint.sol";
 
-library PeriodicShare {
+library VolumeDrip {
   using SafeMath for uint256;
   using SafeCast for uint256;
 
@@ -28,7 +28,7 @@ library PeriodicShare {
   }
 
   function initialize(State storage self, uint256 _periodBlocks, uint256 _currentBlock) internal {
-    require(_periodBlocks > 0, "PeriodicShare/period-gt-zero");
+    require(_periodBlocks > 0, "VolumeDrip/period-gt-zero");
     Period memory empty = Period({
       totalSupply: 0,
       totalAccrued: 0
@@ -84,7 +84,7 @@ library PeriodicShare {
   }
 
   modifier onlyPeriodOver(State storage self, uint256 _currentBlock) {
-    require(_currentBlock > self.periodStartedAt.add(self.periodBlocks), "PeriodicShare/period-not-over");
+    require(_currentBlock > uint256(self.periodStartedAt).add(self.periodBlocks), "VolumeDrip/period-not-over");
     _;
   }
 }

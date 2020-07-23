@@ -9,8 +9,8 @@ import "../token/TokenControllerInterface.sol";
 import "../token/ControlledToken.sol";
 import "../prize-pool/PrizePool.sol";
 import "../Constants.sol";
-import "../drip/DripManager.sol";
-import "../drip/PeriodicShare.sol";
+import "../drip/BalanceDripManager.sol";
+import "../drip/VolumeDrip.sol";
 
 contract PrizeStrategyStorage {
   struct Credit {
@@ -43,10 +43,10 @@ contract PrizeStrategyStorage {
 
   uint256 public exitFeeMantissa;
 
-  MappedSinglyLinkedList.Mapping internal referralPeriodicShareKeys;
-  mapping(address => PeriodicShare.State) referralPeriodicShares;
+  MappedSinglyLinkedList.Mapping internal referralVolumeDripKeys;
+  mapping(address => VolumeDrip.State) referralVolumeDrips;
 
   uint256 public creditRateMantissa;
 
-  DripManager.State dripManager;
+  BalanceDripManager.State dripManager;
 }

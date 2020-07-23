@@ -170,7 +170,8 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
   function timelockDepositTo(
     address to,
     uint256 amount,
-    address controlledToken
+    address controlledToken,
+    bytes calldata data
   )
     external
     onlyControlledToken(controlledToken)
@@ -185,7 +186,7 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     timelockBalances[operator] = timelockBalances[operator].sub(amount);
     timelockTotalSupply = timelockTotalSupply.sub(amount);
 
-    prizeStrategy.afterTimelockDepositTo(operator, to, amount, controlledToken);
+    prizeStrategy.afterTimelockDepositTo(operator, to, amount, controlledToken, data);
 
     emit TimelockDeposited(operator, to, controlledToken, amount);
   }
@@ -248,6 +249,7 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     if (exitFee > maxFee) {
       exitFee = maxFee;
     }
+    
     require(exitFee <= maximumExitFee, "PrizePool/exit-fee-exceeds-user-maximum");
 
     uint256 sponsoredExitFeePortion = (exitFee > sponsorAmount) ? sponsorAmount : exitFee;
@@ -264,6 +266,7 @@ abstract contract PrizePool is OwnableUpgradeSafe, BaseRelayRecipient, Reentranc
     // redeem the tickets less the fee
     uint256 amountLessFee = amount.sub(userExitFee);
     _redeem(amountLessFee);
+
     _token().transfer(from, amountLessFee);
 
     if (_hasPrizeStrategy()) {

@@ -125,7 +125,7 @@ function PoolEnv() {
 
     let amount = toWei('' + tickets)
 
-    await prizePool.timelockDepositTo(wallet._address, amount, ticket.address, this.overrides)
+    await prizePool.timelockDepositTo(wallet._address, amount, ticket.address, [], this.overrides)
 
     debug(`Bought tickets with timelocked tokens`)
   }
@@ -141,7 +141,7 @@ function PoolEnv() {
 
     let amount = toWei('' + sponsorship)
 
-    await prizePool.timelockDepositTo(wallet._address, amount, sponsorshipContract.address, this.overrides)
+    await prizePool.timelockDepositTo(wallet._address, amount, sponsorshipContract.address, [], this.overrides)
 
     debug(`Bought sponsorship with timelocked tokens`)
   }

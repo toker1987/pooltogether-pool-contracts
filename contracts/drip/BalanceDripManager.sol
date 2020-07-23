@@ -3,16 +3,16 @@ pragma solidity ^0.6.4;
 import "@nomiclabs/buidler/console.sol";
 
 import "../prize-pool/MappedSinglyLinkedList.sol";
-import "./Drip.sol";
+import "./BalanceDrip.sol";
 
-library DripManager {
+library BalanceDripManager {
   using SafeMath for uint256;
   using MappedSinglyLinkedList for MappedSinglyLinkedList.Mapping;
-  using Drip for Drip.State;
+  using BalanceDrip for BalanceDrip.State;
 
   struct State {
     mapping(address => MappedSinglyLinkedList.Mapping) dripTokens;
-    mapping(address => mapping(address => Drip.State)) drips;
+    mapping(address => mapping(address => BalanceDrip.State)) drips;
   }
 
   function updateDrips(
@@ -25,7 +25,7 @@ library DripManager {
   ) internal {
     address currentDripToken = self.dripTokens[measure].addressMap[MappedSinglyLinkedList.SENTINAL_TOKEN];
     while (currentDripToken != address(0) && currentDripToken != MappedSinglyLinkedList.SENTINAL_TOKEN) {
-      Drip.State storage dripState = self.drips[measure][currentDripToken];
+      BalanceDrip.State storage dripState = self.drips[measure][currentDripToken];
       dripState.drip(
         user,
         measureBalance,
@@ -59,17 +59,17 @@ library DripManager {
     return self.dripTokens[measure].contains(dripToken);
   }
 
-  function getDrip(State storage self, address measure, address dripToken) internal view returns (Drip.State storage) {
+  function getDrip(State storage self, address measure, address dripToken) internal view returns (BalanceDrip.State storage) {
     return self.drips[measure][dripToken];
   }
 
   function balanceOfDrip(State storage self, address user, address measure, address dripToken) internal view returns (uint256) {
-    Drip.State storage dripState = self.drips[measure][dripToken];
+    BalanceDrip.State storage dripState = self.drips[measure][dripToken];
     return dripState.userStates[user].dripBalance;
   }
 
   function claimDrip(State storage self, address user, address measure, address dripToken) internal returns (uint256) {
-    Drip.State storage dripState = self.drips[measure][dripToken];
+    BalanceDrip.State storage dripState = self.drips[measure][dripToken];
     uint256 balance = dripState.userStates[user].dripBalance;
     dripState.burnDrip(user, balance);
     IERC20(dripToken).transfer(user, balance);
@@ -83,7 +83,7 @@ library DripManager {
       if (burnedBalance >= availableSupply) {
         break;
       }
-      Drip.State storage dripState = self.drips[measures[i]][dripToken];
+      BalanceDrip.State storage dripState = self.drips[measures[i]][dripToken];
       uint256 balance = dripState.userStates[user].dripBalance;
       if (burnedBalance.add(balance) > availableSupply) {
         balance = availableSupply.sub(burnedBalance);

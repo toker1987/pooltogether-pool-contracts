@@ -1,11 +1,11 @@
 pragma solidity ^0.6.4;
 
-import "../drip/PeriodicShare.sol";
+import "../drip/VolumeDrip.sol";
 
-contract PeriodicShareExposed {
-  using PeriodicShare for PeriodicShare.State;
+contract VolumeDripExposed {
+  using VolumeDrip for VolumeDrip.State;
 
-  PeriodicShare.State referrals;
+  VolumeDrip.State referrals;
 
   function initialize(uint256 _periodSeconds, uint256 _currentTime) external {
     referrals.initialize(_periodSeconds, _currentTime);
@@ -15,8 +15,8 @@ contract PeriodicShareExposed {
     return referrals.isPeriodOver(currentTime);
   }
 
-  function completePeriod(uint256 totalAccrued, uint256 currentTime) external {
-    referrals.completePeriod(totalAccrued, currentTime);
+  function completePeriod(uint256 currentTime) external {
+    referrals.completePeriod(currentTime);
   }
 
   function mint(address user, uint256 amount) external {

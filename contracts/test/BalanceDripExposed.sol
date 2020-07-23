@@ -1,11 +1,11 @@
 pragma solidity ^0.6.4;
 
-import "../drip/Drip.sol";
+import "../drip/BalanceDrip.sol";
 
-contract DripExposed {
-  using Drip for Drip.State;
+contract BalanceDripExposed {
+  using BalanceDrip for BalanceDrip.State;
 
-  Drip.State internal dripState;
+  BalanceDrip.State internal dripState;
 
   function initialize(
     uint256 dripRatePerBlock,
