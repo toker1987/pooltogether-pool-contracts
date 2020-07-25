@@ -8,7 +8,6 @@ import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.so
 import "@openzeppelin/contracts-ethereum-package/contracts/utils/ReentrancyGuard.sol";
 import "@opengsn/gsn/contracts/BaseRelayRecipient.sol";
 import "@pooltogether/fixed-point/contracts/FixedPoint.sol";
-import "@pooltogether/governor-contracts/contracts/GovernorInterface.sol";
 import "sortition-sum-tree-factory/contracts/SortitionSumTreeFactory.sol";
 import "@pooltogether/uniform-random-number/contracts/UniformRandomNumber.sol";
 
@@ -31,7 +30,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
   using SafeCast for uint256;
   using SortitionSumTreeFactory for SortitionSumTreeFactory.SortitionSumTrees;
   using MappedSinglyLinkedList for MappedSinglyLinkedList.Mapping;
-  using BalanceDripManager for BalanceDripManager.State;
 
   bytes32 constant private TREE_KEY = keccak256("PoolTogether/Ticket");
   uint256 constant private MAX_TREE_LEAVES = 5;
@@ -66,7 +64,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
 
   function initialize (
     address _trustedForwarder,
-    GovernorInterface _governor,
+    ComptrollerInterface _comptroller,
     uint256 _prizePeriodSeconds,
     PrizePool _prizePool,
     address _ticket,
@@ -74,7 +72,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
     RNGInterface _rng,
     address[] memory _externalAwards
   ) public initializer {
-    require(address(_governor) != address(0), "PrizeStrategy/governor-not-zero");
+    require(address(_comptroller) != address(0), "PrizeStrategy/comptroller-not-zero");
     require(_prizePeriodSeconds > 0, "PrizeStrategy/prize-period-greater-than-zero");
     require(address(_prizePool) != address(0), "PrizeStrategy/prize-pool-zero");
     require(address(_ticket) != address(0), "PrizeStrategy/ticket-not-zero");
@@ -87,7 +85,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
     trustedForwarder = _trustedForwarder;
     __Ownable_init();
     __ReentrancyGuard_init();
-    governor = _governor;
+    comptroller = _comptroller;
     prizePeriodSeconds = _prizePeriodSeconds;
     Constants.REGISTRY.setInterfaceImplementer(address(this), Constants.TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
     prizePeriodStartedAt = _currentTime();
@@ -404,10 +402,10 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @param amount The prize amount
   /// @return The size of the reserve portion of the prize
   function _calculateReserveFee(uint256 amount) internal view returns (uint256) {
-    if (governor.reserve() == address(0) || governor.reserveFeeMantissa() == 0) {
+    if (comptroller.reserveFeeMantissa() == 0) {
       return 0;
     }
-    return FixedPoint.multiplyUintByMantissa(amount, governor.reserveFeeMantissa());
+    return FixedPoint.multiplyUintByMantissa(amount, comptroller.reserveFeeMantissa());
   }
 
   /// @notice Estimates the prize size using the default ETHEREUM_BLOCK_TIME_ESTIMATE_MANTISSA
@@ -496,7 +494,6 @@ contract PrizeStrategy is PrizeStrategyStorage,
     uint256 creditEarned = _calculateEarlyExitFee(amount);
     creditBalances[user].balance = uint256(creditBalances[user].balance).add(creditEarned).toUint128();
     prizePool.award(user, amount, address(ticket));
-
   }
 
   /// @notice Awards all external tokens with non-zero balances to the given user.  The external tokens must be held by the PrizePool contract.
@@ -592,60 +589,18 @@ contract PrizeStrategy is PrizeStrategyStorage,
     uint256 oldBalance = balance.sub(amount);
     uint256 totalSupply = IERC20(controlledToken).totalSupply();
 
-    dripManager.updateDrips(
-      controlledToken,
-      to,
-      oldBalance,
-      totalSupply.sub(amount),
-      _currentBlock()
-    );
+    address referrer;
+    if (data.length > 0) {
+      (address ref) = abi.decode(data, (address));
+      referrer = ref;
+    }
+
+    comptroller.afterDepositTo(to, amount, balance, totalSupply, controlledToken, referrer);
 
     if (controlledToken == address(ticket)) {
       _accrueCredit(to, oldBalance);
       sortitionSumTrees.set(TREE_KEY, balance, bytes32(uint256(to)));
     }
-
-    if (data.length > 0) {
-      (address referrer) = abi.decode(data, (address));
-      console.log("referral address: %s", referrer);
-      _mintReferral(referrer, amount);
-    }
-  }
-
-  function _mintReferral(address referrer, uint256 amount) internal {
-    console.log("updateDrips...");
-    // dripManager.updateDrips(address(referral), referrer, _currentBlock());
-    console.log("controllerMint...");
-    _updateReferralVolumeDrips();
-
-  }
-
-  function _updateReferralVolumeDrips() internal {
-    // uint256 currentTime = _currentTime();
-    // address referralVolumeDripKey = referralVolumeDrips.addressMap[MappedSinglyLinkedList.SENTINAL_TOKEN];
-    // while (referralVolumeDripKey != address(0) && referralVolumeDripKey != MappedSinglyLinkedList.SENTINAL_TOKEN) {
-    //   VolumeDrip.State storage periodicShare = referralVolumeDrips[referralVolumeDripKey];
-    //   if (periodicShare.isPeriodOver(currentTime)) {
-    //     dripManager.updateDrips(referralVolumeDripKey, referralVolumeDripKey, 1 ether, 1 ether, _currentBlock());
-    //   }
-    //   // just drip everything out to the periodic shares
-    // }
-  }
-
-  function addDripToken(address measure, address dripToken, uint256 dripRatePerBlock) external onlyOwner {
-    dripManager.addDripToken(measure, dripToken, dripRatePerBlock, _currentBlock());
-  }
-
-  function setDripRate(address measure, address dripToken, uint256 dripRatePerBlock) external onlyOwner {
-    dripManager.setDripRate(measure, dripToken, dripRatePerBlock);
-  }
-
-  function claimDrip(address user, address measure, address dripToken) external {
-    dripManager.claimDrip(user, measure, dripToken);
-  }
-
-  function claimVolumeDrip(address user, address periodicShareKey, address dripToken) external {
-
   }
 
   /// @notice Called by the prize pool after a withdrawal with timelock has been made.
@@ -653,7 +608,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
   /// @param controlledToken The type of collateral that was withdrawn
   function afterWithdrawWithTimelockFrom(
     address from,
-    uint256,
+    uint256 amount,
     address controlledToken,
     bytes calldata
   )
@@ -662,9 +617,10 @@ contract PrizeStrategy is PrizeStrategyStorage,
     onlyPrizePool
     requireNotLocked
   {
+    uint256 balance = IERC20(controlledToken).balanceOf(from);
+    comptroller.afterWithdrawFrom(from, amount, balance, IERC20(controlledToken).totalSupply(), controlledToken);
     if (controlledToken == address(ticket)) {
-      uint256 fromBalance = ticket.balanceOf(from);
-      sortitionSumTrees.set(TREE_KEY, fromBalance, bytes32(uint256(from)));
+      sortitionSumTrees.set(TREE_KEY, balance, bytes32(uint256(from)));
     }
   }
 
@@ -743,7 +699,7 @@ contract PrizeStrategy is PrizeStrategyStorage,
     delete rngRequest;
 
     if (reserveFee > 0) {
-      _awardSponsorship(governor.reserve(), reserveFee);
+      _awardSponsorship(address(comptroller), reserveFee);
     }
 
     address winner = draw(randomNumber);

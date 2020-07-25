@@ -1,16 +1,14 @@
 pragma solidity ^0.6.4;
 
 import "sortition-sum-tree-factory/contracts/SortitionSumTreeFactory.sol";
-import "@pooltogether/governor-contracts/contracts/GovernorInterface.sol";
 import "@pooltogether/pooltogether-rng-contracts/contracts/RNGInterface.sol";
 
+import "../comptroller/ComptrollerInterface.sol";
 import "../prize-pool/MappedSinglyLinkedList.sol";
 import "../token/TokenControllerInterface.sol";
 import "../token/ControlledToken.sol";
 import "../prize-pool/PrizePool.sol";
 import "../Constants.sol";
-import "../drip/BalanceDripManager.sol";
-import "../drip/VolumeDrip.sol";
 
 contract PrizeStrategyStorage {
   struct Credit {
@@ -21,7 +19,7 @@ contract PrizeStrategyStorage {
   mapping(address => Credit) internal creditBalances;
 
   PrizePool public prizePool;
-  GovernorInterface public governor;
+  ComptrollerInterface public comptroller;
   IERC20 public ticket;
   IERC20 public sponsorship;
   RNGInterface public rng;
@@ -42,11 +40,5 @@ contract PrizeStrategyStorage {
   MappedSinglyLinkedList.Mapping internal externalAwardMapping;
 
   uint256 public exitFeeMantissa;
-
-  MappedSinglyLinkedList.Mapping internal referralVolumeDripKeys;
-  mapping(address => VolumeDrip.State) referralVolumeDrips;
-
   uint256 public creditRateMantissa;
-
-  BalanceDripManager.State dripManager;
 }

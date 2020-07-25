@@ -31,21 +31,21 @@ describe('BalanceDripManagerExposed', function() {
     drip2 = await deployContract(wallet, ERC20Mintable, [], overrides)
   })
 
-  describe('addDripToken()', () => {
+  describe('addDrip()', () => {
     it('should add a drip token', async () => {
-      await dripExposed.addDripToken(measure.address, drip1.address, toWei('0.001'), '1')
-      expect(await dripExposed.hasDripToken(measure.address, drip1.address)).to.be.true
+      await dripExposed.addDrip(measure.address, drip1.address, toWei('0.001'), '1')
+      expect(await dripExposed.hasDrip(measure.address, drip1.address)).to.be.true
     })
 
     it('should not add a drip token twice', async () => {
-      await dripExposed.addDripToken(measure.address, drip1.address, toWei('0.001'), '1')
-      await expect(dripExposed.addDripToken(measure.address, drip1.address, toWei('0.001'), '2')).to.be.revertedWith('DripManager/drip-exists')
+      await dripExposed.addDrip(measure.address, drip1.address, toWei('0.001'), '1')
+      await expect(dripExposed.addDrip(measure.address, drip1.address, toWei('0.001'), '2')).to.be.revertedWith('DripManager/drip-exists')
     })
   })
 
   describe('setDripRate()', () => {
     it('should allow the drip rate to be changed', async () => {
-      await dripExposed.addDripToken(measure.address, drip1.address, toWei('0.001'), '1')
+      await dripExposed.addDrip(measure.address, drip1.address, toWei('0.001'), '1')
       await dripExposed.setDripRate(measure.address, drip1.address, toWei('0.1'))
 
       let detail = await dripExposed.getDrip(measure.address, drip1.address)
@@ -56,7 +56,7 @@ describe('BalanceDripManagerExposed', function() {
 
   describe('updateDrips()', () => {
     it('should allow a user that has accrued to claim their tokens', async () => {
-      await dripExposed.addDripToken(measure.address, drip1.address, toWei('0.001'), '1')
+      await dripExposed.addDrip(measure.address, drip1.address, toWei('0.001'), '1')
 
       // give the dripExposed some tokens to distribute
       await drip1.mint(dripExposed.address, toWei('1000'))
@@ -83,9 +83,9 @@ describe('BalanceDripManagerExposed', function() {
     })
   })
 
-  describe('claimDrip()', () => {
+  describe('claimDripTokens()', () => {
     it('should allow a user to transfer tokens to themselves', async () => {
-      await dripExposed.addDripToken(measure.address, drip1.address, toWei('0.001'), '1')
+      await dripExposed.addDrip(measure.address, drip1.address, toWei('0.001'), '1')
       // give the dripExposed some tokens to distribute
       await drip1.mint(dripExposed.address, toWei('1000'))
 
@@ -99,7 +99,7 @@ describe('BalanceDripManagerExposed', function() {
       // user should accrue the total per block
       expect(await dripExposed.balanceOfDrip(wallet._address, measure.address, drip1.address)).to.equal(toWei('0.001'))
 
-      await dripExposed.claimDrip(wallet._address, measure.address, drip1.address)
+      await dripExposed.claimDripTokens(wallet._address, measure.address, drip1.address)
 
       expect(await drip1.balanceOf(wallet._address)).to.equal(toWei('0.001'))
       expect(await dripExposed.balanceOfDrip(wallet._address, measure.address, drip1.address)).to.equal(toWei('0'))

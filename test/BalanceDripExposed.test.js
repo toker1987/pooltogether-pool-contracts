@@ -4,7 +4,6 @@ const BalanceDripExposed = require('../build/BalanceDripExposed.json')
 const { ethers } = require('./helpers/ethers')
 const { expect } = require('chai')
 const buidler = require('./helpers/buidler')
-const { AddressZero } = require('ethers/constants')
 
 const toWei = ethers.utils.parseEther
 

@@ -1,7 +1,7 @@
 const PrizeStrategyHarness = require('../build/PrizeStrategyHarness.json')
 const RNGServiceMock = require('../build/RNGServiceMock.json')
 const Forwarder = require('../build/Forwarder.json')
-const MockGovernor = require('../build/MockGovernor.json')
+const MockComptroller = require('../build/MockComptroller.json')
 const ControlledToken = require('../build/ControlledToken.json')
 const CompoundPrizePoolHarness = require('../build/CompoundPrizePoolHarness.json')
 const CTokenMock = require('../build/CTokenMock.json')
@@ -37,7 +37,7 @@ async function deployTestPool({
 
   debug('Deploying Governor...')
 
-  let governor = await deployContract(wallet, MockGovernor, [], overrides)
+  let governor = await deployContract(wallet, MockComptroller, [], overrides)
 
   debug('Deploying PrizeStrategy...')
 

@@ -19,12 +19,12 @@ contract BalanceDripManagerExposed {
     dripManager.updateDrips(measure, user, measureBalance, measureTotalSupply, blockNumber);
   }
 
-  function addDripToken(address measure, address dripToken, uint256 dripRatePerBlock, uint256 blockNumber) external {
-    dripManager.addDripToken(measure, dripToken, dripRatePerBlock, blockNumber);
+  function addDrip(address measure, address dripToken, uint256 dripRatePerBlock, uint256 blockNumber) external {
+    dripManager.addDrip(measure, dripToken, dripRatePerBlock, blockNumber);
   }
 
-  function hasDripToken(address measure, address dripToken) external view returns (bool) {
-    return dripManager.hasDripToken(measure, dripToken);
+  function hasDrip(address measure, address dripToken) external view returns (bool) {
+    return dripManager.hasDrip(measure, dripToken);
   }
 
   function setDripRate(address measure, address dripToken, uint256 dripRatePerBlock) external {
@@ -53,7 +53,7 @@ contract BalanceDripManagerExposed {
     blockNumber = dripState.blockNumber;
   }
 
-  function claimDrip(address user, address measure, address dripToken) external {
-    dripManager.claimDrip(user, measure, dripToken);
+  function claimDripTokens(address user, address measure, address dripToken) external {
+    dripManager.claimDripTokens(user, measure, dripToken);
   }
 }

@@ -1,7 +1,5 @@
 pragma solidity ^0.6.4;
 
-import "@nomiclabs/buidler/console.sol";
-
 import "../prize-pool/MappedSinglyLinkedList.sol";
 import "./BalanceDrip.sol";
 
@@ -12,7 +10,7 @@ library BalanceDripManager {
 
   struct State {
     mapping(address => MappedSinglyLinkedList.Mapping) dripTokens;
-    mapping(address => mapping(address => BalanceDrip.State)) drips;
+    mapping(address => mapping(address => BalanceDrip.State)) balanceDrips;
   }
 
   function updateDrips(
@@ -25,7 +23,7 @@ library BalanceDripManager {
   ) internal {
     address currentDripToken = self.dripTokens[measure].addressMap[MappedSinglyLinkedList.SENTINAL_TOKEN];
     while (currentDripToken != address(0) && currentDripToken != MappedSinglyLinkedList.SENTINAL_TOKEN) {
-      BalanceDrip.State storage dripState = self.drips[measure][currentDripToken];
+      BalanceDrip.State storage dripState = self.balanceDrips[measure][currentDripToken];
       dripState.drip(
         user,
         measureBalance,
@@ -36,7 +34,7 @@ library BalanceDripManager {
     }
   }
 
-  function addDripToken(State storage self, address measure, address dripToken, uint256 dripRatePerBlock, uint256 currentBlockNumber) internal {
+  function addDrip(State storage self, address measure, address dripToken, uint256 dripRatePerBlock, uint256 currentBlockNumber) internal {
     require(!self.dripTokens[measure].contains(dripToken), "DripManager/drip-exists");
     if (self.dripTokens[measure].count == 0) {
       address[] memory single = new address[](1);
@@ -45,45 +43,56 @@ library BalanceDripManager {
     } else {
       self.dripTokens[measure].addAddress(dripToken);
     }
+    self.balanceDrips[measure][dripToken].initialize(currentBlockNumber);
+    self.balanceDrips[measure][dripToken].dripRatePerBlock = dripRatePerBlock;
+  }
 
-    self.drips[measure][dripToken].initialize(currentBlockNumber);
-    self.drips[measure][dripToken].dripRatePerBlock = dripRatePerBlock;
+  function removeDrip(
+    State storage self,
+    address measure,
+    address prevDripToken,
+    address dripToken
+  )
+    internal
+  {
+    delete self.balanceDrips[measure][dripToken];
+    self.dripTokens[measure].removeAddress(prevDripToken, dripToken);
   }
 
   function setDripRate(State storage self, address measure, address dripToken, uint256 dripRatePerBlock) internal {
     require(self.dripTokens[measure].contains(dripToken), "DripManager/drip-not-exists");
-    self.drips[measure][dripToken].dripRatePerBlock = dripRatePerBlock;
+    self.balanceDrips[measure][dripToken].dripRatePerBlock = dripRatePerBlock;
   }
 
-  function hasDripToken(State storage self, address measure, address dripToken) internal view returns (bool) {
+  function hasDrip(State storage self, address measure, address dripToken) internal view returns (bool) {
     return self.dripTokens[measure].contains(dripToken);
   }
 
   function getDrip(State storage self, address measure, address dripToken) internal view returns (BalanceDrip.State storage) {
-    return self.drips[measure][dripToken];
+    return self.balanceDrips[measure][dripToken];
   }
 
   function balanceOfDrip(State storage self, address user, address measure, address dripToken) internal view returns (uint256) {
-    BalanceDrip.State storage dripState = self.drips[measure][dripToken];
+    BalanceDrip.State storage dripState = self.balanceDrips[measure][dripToken];
     return dripState.userStates[user].dripBalance;
   }
 
-  function claimDrip(State storage self, address user, address measure, address dripToken) internal returns (uint256) {
-    BalanceDrip.State storage dripState = self.drips[measure][dripToken];
+  function claimDripTokens(State storage self, address user, address measure, address dripToken) internal returns (uint256) {
+    BalanceDrip.State storage dripState = self.balanceDrips[measure][dripToken];
     uint256 balance = dripState.userStates[user].dripBalance;
     dripState.burnDrip(user, balance);
     IERC20(dripToken).transfer(user, balance);
     return balance;
   }
 
-  function batchClaimDrip(State storage self, address user, address[] memory measures, address dripToken) internal {
+  function batchClaimDripTokens(State storage self, address user, address[] memory measures, address dripToken) internal {
     uint256 availableSupply = IERC20(dripToken).balanceOf(address(this));
     uint256 burnedBalance;
     for (uint256 i = 0; i < measures.length; i++) {
       if (burnedBalance >= availableSupply) {
         break;
       }
-      BalanceDrip.State storage dripState = self.drips[measures[i]][dripToken];
+      BalanceDrip.State storage dripState = self.balanceDrips[measures[i]][dripToken];
       uint256 balance = dripState.userStates[user].dripBalance;
       if (burnedBalance.add(balance) > availableSupply) {
         balance = availableSupply.sub(burnedBalance);
